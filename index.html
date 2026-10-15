@@ -3,169 +3,267 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BTC & ETH 真實爆倉雷達</title>
+  <title>幣安即時爆倉儀表板</title>
   <style>
     :root {
-      --bg-color: #0b0e14; --card-bg: #151a23; --card-sub-bg: #1c2331;
-      --text-main: #f0f3f6; --text-muted: #848e9c; --green: #0ecb81;
-      --red: #f6465d; --yellow: #f0b90b; --border: #232a3b;
+      --bg-dark: #0b0e11;
+      --card-bg: #151922;
+      --text-main: #eaecef;
+      --text-muted: #848e9c;
+      --green: #0ecb81;
+      --red: #f6465d;
+      --yellow: #fcd535;
+      --bar-bg: #2b3139;
+      --border: #2b3139;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; padding: 24px 16px; }
-    .container { width: 100%; max-width: 480px; background: var(--card-bg); border-radius: 16px; padding: 24px; border: 1px solid var(--border); }
+    body { background-color: var(--bg-dark); color: var(--text-main); display: flex; justify-content: center; padding: 20px; }
+    .container { width: 100%; max-width: 500px; background: var(--bg-dark); border-radius: 12px; }
     
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .status-badge { font-size: 12px; padding: 4px 10px; border-radius: 20px; display: flex; align-items: center; gap: 6px; font-weight: 600; }
-    .status-connected { background: rgba(14, 203, 129, 0.15); color: var(--green); }
-    .status-disconnected { background: rgba(246, 70, 93, 0.15); color: var(--red); }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+    .header-title { font-size: 20px; font-weight: bold; margin-bottom: 8px; }
+    .header-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
     
-    .hero-stat { margin-bottom: 24px; }
-    .hero-title { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
-    .hero-val { font-size: 32px; font-weight: 700; }
+    .section { margin-bottom: 24px; }
+    .section-title { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; display: flex; align-items: center; }
     
-    .price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
-    .price-card { background: var(--card-sub-bg); padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); }
-    .price-name { font-size: 12px; color: var(--text-muted); }
-    .price-value { font-size: 18px; font-weight: 700; margin-top: 4px; }
+    /* 時間分佈 Bars */
+    .time-row { display: flex; align-items: center; margin-bottom: 12px; font-size: 14px; }
+    .time-label { width: 60px; font-weight: 500; }
+    .time-bar-container { flex-grow: 1; height: 16px; margin: 0 12px; }
+    .time-bar { height: 100%; background: var(--bar-bg); border-radius: 4px; transition: width 0.5s ease; min-width: 4px;}
+    .time-bar.yellow { background: var(--yellow); }
+    .time-value { width: 70px; text-align: right; color: var(--text-muted); }
+    .time-value.yellow { color: var(--yellow); }
     
-    .feed-container { max-height: 250px; overflow-y: auto; }
-    .feed-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 13px; animation: fadeIn 0.4s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
-    .feed-symbol { font-weight: 600; width: 70px;}
-    .feed-amount { font-weight: 700; text-align: right; flex-grow: 1; margin-right: 10px;}
-    .side-tag { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-align: center;}
-    .side-sell { background: rgba(246, 70, 93, 0.15); color: var(--red); } 
-    .side-buy { background: rgba(14, 203, 129, 0.15); color: var(--green); } 
+    /* 占比提示框 */
+    .ratio-box { border: 1px solid rgba(252, 213, 53, 0.3); background: rgba(252, 213, 53, 0.05); color: var(--yellow); padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-top: 16px; }
+    
+    /* 方向 Bars */
+    .dir-row { display: flex; align-items: center; margin-bottom: 16px; font-size: 13px; }
+    .dir-label { width: 60px; font-weight: 500; }
+    .dir-bar-container { flex-grow: 1; height: 20px; display: flex; border-radius: 4px; overflow: hidden; margin: 0 12px; }
+    .dir-long { background: var(--green); height: 100%; display: flex; align-items: center; padding-left: 8px; color: #000; font-weight: 600; transition: width 0.3s; }
+    .dir-short { background: var(--red); height: 100%; display: flex; justify-content: flex-end; align-items: center; padding-right: 8px; color: #fff; font-weight: 600; transition: width 0.3s; }
+    .dir-value { width: 70px; text-align: right; color: var(--red); }
+    
+    /* 最大一筆卡片 */
+    .max-card { background: var(--card-bg); padding: 16px; border-radius: 8px; margin-bottom: 24px; }
+    .max-title { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+    .max-desc { font-size: 14px; font-weight: bold; margin-bottom: 8px; line-height: 1.4; }
+    .max-prices { font-size: 12px; color: var(--text-muted); }
+    
+    .footer { text-align: left; font-size: 14px; font-weight: bold; color: var(--yellow); border-top: 1px solid var(--border); padding-top: 16px; }
+    
+    /* 連線狀態 */
+    #status { display: inline-block; width: 8px; height: 8px; background: var(--green); border-radius: 50%; margin-right: 6px; }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <div class="header">
-    <div style="font-weight: 700; font-size: 16px;">真實爆倉雷達</div>
-    <div id="statusBadge" class="status-badge status-disconnected">
-      <div class="status-dot"></div>
-      <span id="statusText">連線中...</span>
+  <div class="header-title"><span id="status"></span>網頁開啟後累計 <span id="totalUsers">0</span> 人被爆倉</div>
+  <div class="header-sub">一共爆掉 <span id="totalAmountAll">0</span> 美元 —— 請保持網頁開啟以累積數據</div>
+
+  <!-- 1. 時間分佈 -->
+  <div class="section">
+    <div class="section-title">① 時間分布：越靠近現在，爆得越狠</div>
+    
+    <div class="time-row">
+      <div class="time-label">24 小時</div>
+      <div class="time-bar-container"><div class="time-bar" id="bar24h" style="width: 0%;"></div></div>
+      <div class="time-value" id="val24h">0</div>
+    </div>
+    <div class="time-row">
+      <div class="time-label">12 小時</div>
+      <div class="time-bar-container"><div class="time-bar" id="bar12h" style="width: 0%;"></div></div>
+      <div class="time-value" id="val12h">0</div>
+    </div>
+    <div class="time-row">
+      <div class="time-label">4 小時</div>
+      <div class="time-bar-container"><div class="time-bar" id="bar4h" style="width: 0%;"></div></div>
+      <div class="time-value" id="val4h">0</div>
+    </div>
+    <div class="time-row" style="color: var(--yellow);">
+      <div class="time-label">1 小時</div>
+      <div class="time-bar-container"><div class="time-bar yellow" id="bar1h" style="width: 0%;"></div></div>
+      <div class="time-value yellow" id="val1h">0</div>
+    </div>
+
+    <div class="ratio-box">
+      最後 1 小時爆掉的錢，占 24 小時的 <span id="ratio1h">0.0</span>%
     </div>
   </div>
 
-  <div class="hero-stat">
-    <div class="hero-title">本次連線累計清算額</div>
-    <div class="hero-val" id="totalLiqAmount">$0.00</div>
-    <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-      共捕獲 <span id="liqCount" style="color: #fff; font-weight: 600;">0</span> 筆合約強平訂單
-    </div>
-  </div>
-
-  <div class="price-grid">
-    <div class="price-card">
-      <div class="price-name">BTCUSDT 永續</div>
-      <div class="price-value" id="btcPrice">--</div>
-    </div>
-    <div class="price-card">
-      <div class="price-name">ETHUSDT 永續</div>
-      <div class="price-value" id="ethPrice">--</div>
-    </div>
-  </div>
-
-  <div style="background: var(--card-sub-bg); border-radius: 12px; padding: 16px; border: 1px solid var(--border);">
-    <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; font-weight: 600;">官方即時強平流水 (金額 > $1,000)</div>
-    <div class="feed-container" id="feedList">
-      <div id="emptyMsg" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">
-        已連上幣安。目前市場平靜，等待下一位爆倉者...
+  <!-- 2. 方向 -->
+  <div class="section">
+    <div class="section-title">② 方向：多單/空單血洗比例</div>
+    
+    <div class="dir-row">
+      <div class="dir-label">24 小時</div>
+      <div class="dir-bar-container">
+        <div class="dir-long" id="longBar24h" style="width: 50%;">多單 50%</div>
+        <div class="dir-short" id="shortBar24h" style="width: 50%;"></div>
       </div>
+      <div class="dir-value" id="shortText24h">空單 50%</div>
     </div>
+    <div class="dir-row">
+      <div class="dir-label">1 小時</div>
+      <div class="dir-bar-container">
+        <div class="dir-long" id="longBar1h" style="width: 50%;">多單 50%</div>
+        <div class="dir-short" id="shortBar1h" style="width: 50%;"></div>
+      </div>
+      <div class="dir-value" id="shortText1h">空單 50%</div>
+    </div>
+  </div>
+
+  <!-- 3. 最大一筆 -->
+  <div class="max-card">
+    <div class="max-title">③ 本次監控最大一筆</div>
+    <div class="max-desc" id="maxOrderText">目前尚無爆倉數據...</div>
+    <div class="max-prices">
+      現在：$BTC <span id="currentBtc">--</span> ｜ $ETH <span id="currentEth">--</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    你的槓桿，扛得住第二根針嗎？
   </div>
 </div>
 
 <script>
-  let totalLiqUSD = 0, totalCount = 0;
+  // 儲存所有爆倉事件的陣列
+  let liquidations = [];
+  let maxOrder = { amount: 0, symbol: '' };
   
-  const formatCurrency = (num) => {
-    if (num >= 1000000) return '$' + (num / 1000000).toFixed(2) + ' M';
-    if (num >= 1000) return '$' + (num / 1000).toFixed(2) + ' K';
-    return '$' + num.toFixed(2);
+  // 格式化數字 (將數字轉為萬/億)
+  const formatNum = (num) => {
+    if (num >= 100000000) return (num / 100000000).toFixed(2) + ' 億';
+    if (num >= 10000) return (num / 10000).toFixed(2) + ' 萬';
+    return num.toFixed(0);
   };
 
-  // 1. 使用 HTTPS API 抓取價格 (繞過 WebSocket 防火牆阻擋)
+  // 即時價格更新
   async function fetchPrices() {
     try {
-      const btcRes = await fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT');
-      const btcData = await btcRes.json();
-      document.getElementById('btcPrice').innerText = "$" + parseFloat(btcData.markPrice).toFixed(2);
+      const resBtc = await fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT');
+      const btc = await resBtc.json();
+      document.getElementById('currentBtc').innerText = parseFloat(btc.markPrice).toLocaleString('en-US', {maximumFractionDigits:0});
 
-      const ethRes = await fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=ETHUSDT');
-      const ethData = await ethRes.json();
-      document.getElementById('ethPrice').innerText = "$" + parseFloat(ethData.markPrice).toFixed(2);
-    } catch (e) {
-      console.error("價格 API 讀取失敗", e);
-    }
+      const resEth = await fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=ETHUSDT');
+      const eth = await resEth.json();
+      document.getElementById('currentEth').innerText = parseFloat(eth.markPrice).toLocaleString('en-US', {maximumFractionDigits:0});
+    } catch(e) {}
   }
-  
-  // 每 2 秒更新一次價格
-  setInterval(fetchPrices, 2000);
+  setInterval(fetchPrices, 3000);
   fetchPrices();
 
-  // 2. 使用官方 WebSocket 訂閱爆倉推播
-  function connectLiqStream() {
-    const ws = new WebSocket("wss://fstream.binance.com/ws/!forceOrder@arr");
-    
-    ws.onopen = () => {
-      document.getElementById('statusBadge').className = 'status-badge status-connected';
-      document.getElementById('statusText').innerText = '已連線幣安';
-      console.log("幣安爆倉資料庫連線成功！");
+  // 更新畫面邏輯
+  function updateDashboard() {
+    const now = Date.now();
+    const ms1H = 60 * 60 * 1000;
+    const ms4H = 4 * ms1H;
+    const ms12H = 12 * ms1H;
+    const ms24H = 24 * ms1H;
+
+    // 清理超過 24 小時的舊資料以免記憶體過載
+    liquidations = liquidations.filter(item => now - item.time <= ms24H);
+
+    let stats = {
+      '1h': { total: 0, long: 0, short: 0 },
+      '4h': { total: 0 },
+      '12h': { total: 0 },
+      '24h': { total: 0, long: 0, short: 0, count: liquidations.length }
     };
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      const order = data.o;
-      
-      // 我們只看 BTC 和 ETH
-      if (order.s === 'BTCUSDT' || order.s === 'ETHUSDT') {
-        const amountUSD = parseFloat(order.p) * parseFloat(order.q);
-        
-        // 過濾小於 1000 美金的微小爆倉
-        if(amountUSD >= 1000) {
-          handleLiquidation(order.s, order.S, amountUSD);
-        }
+    // 歸類計算
+    liquidations.forEach(item => {
+      const age = now - item.time;
+      stats['24h'].total += item.amount;
+      item.isLong ? stats['24h'].long += item.amount : stats['24h'].short += item.amount;
+
+      if (age <= ms12H) stats['12h'].total += item.amount;
+      if (age <= ms4H) stats['4h'].total += item.amount;
+      if (age <= ms1H) {
+        stats['1h'].total += item.amount;
+        item.isLong ? stats['1h'].long += item.amount : stats['1h'].short += item.amount;
       }
-    };
+    });
 
-    ws.onclose = () => {
-      document.getElementById('statusBadge').className = 'status-badge status-disconnected';
-      document.getElementById('statusText').innerText = '斷線重連中...';
-      setTimeout(connectLiqStream, 3000);
+    document.getElementById('totalUsers').innerText = stats['24h'].count.toLocaleString();
+    document.getElementById('totalAmountAll').innerText = formatNum(stats['24h'].total);
+
+    // 更新時間柱狀體
+    const maxBarVal = stats['24h'].total > 0 ? stats['24h'].total : 1;
+    document.getElementById('val24h').innerText = formatNum(stats['24h'].total);
+    document.getElementById('bar24h').style.width = '100%';
+    
+    document.getElementById('val12h').innerText = formatNum(stats['12h'].total);
+    document.getElementById('bar12h').style.width = (stats['12h'].total / maxBarVal * 100) + '%';
+    
+    document.getElementById('val4h').innerText = formatNum(stats['4h'].total);
+    document.getElementById('bar4h').style.width = (stats['4h'].total / maxBarVal * 100) + '%';
+    
+    document.getElementById('val1h').innerText = formatNum(stats['1h'].total);
+    document.getElementById('bar1h').style.width = (stats['1h'].total / maxBarVal * 100) + '%';
+
+    // 1小時占比
+    const ratio = stats['24h'].total > 0 ? (stats['1h'].total / stats['24h'].total * 100).toFixed(1) : 0.0;
+    document.getElementById('ratio1h').innerText = ratio;
+
+    // 更新多空比例 (24H)
+    const pctLong24 = stats['24h'].total > 0 ? (stats['24h'].long / stats['24h'].total * 100).toFixed(1) : 50;
+    const pctShort24 = (100 - pctLong24).toFixed(1);
+    document.getElementById('longBar24h').style.width = pctLong24 + '%';
+    document.getElementById('shortBar24h').style.width = pctShort24 + '%';
+    document.getElementById('longBar24h').innerText = pctLong24 > 15 ? `多單 ${pctLong24}%` : '';
+    document.getElementById('shortText24h').innerText = `空單 ${pctShort24}%`;
+
+    // 更新多空比例 (1H)
+    const pctLong1 = stats['1h'].total > 0 ? (stats['1h'].long / stats['1h'].total * 100).toFixed(1) : 50;
+    const pctShort1 = (100 - pctLong1).toFixed(1);
+    document.getElementById('longBar1h').style.width = pctLong1 + '%';
+    document.getElementById('shortBar1h').style.width = pctShort1 + '%';
+    document.getElementById('longBar1h').innerText = pctLong1 > 15 ? `多單 ${pctLong1}%` : '';
+    document.getElementById('shortText1h').innerText = `空單 ${pctShort1}%`;
+  }
+
+  // WebSocket 連線
+  function connectWs() {
+    const ws = new WebSocket("wss://fstream.binance.com/ws/!forceOrder@arr");
+    const statusDot = document.getElementById('status');
+    
+    ws.onopen = () => { statusDot.style.background = 'var(--green)'; };
+    ws.onclose = () => { statusDot.style.background = 'var(--red)'; setTimeout(connectWs, 3000); };
+    
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data).o;
+      const amountUSD = parseFloat(data.p) * parseFloat(data.q);
+      
+      // 紀錄事件
+      liquidations.push({
+        time: Date.now(),
+        amount: amountUSD,
+        isLong: data.S === 'SELL', // 被迫賣出=多單爆倉
+        symbol: data.s
+      });
+
+      // 檢查是否為最大單
+      if (amountUSD > maxOrder.amount) {
+        maxOrder.amount = amountUSD;
+        maxOrder.symbol = data.s.replace('USDT','');
+        document.getElementById('maxOrderText').innerText = 
+          `全網最大單筆 ${formatNum(maxOrder.amount)}美元，出在 $${maxOrder.symbol} 上`;
+      }
+
+      updateDashboard();
     };
   }
 
-  function handleLiquidation(symbol, side, amount) {
-    const emptyMsg = document.getElementById('emptyMsg');
-    if(emptyMsg) emptyMsg.style.display = 'none';
+  // 啟動
+  connectWs();
+  // 每秒刷新畫面確保時間柱狀圖流動
+  setInterval(updateDashboard, 1000);
 
-    totalCount++;
-    totalLiqUSD += amount;
-
-    document.getElementById('totalLiqAmount').innerText = formatCurrency(totalLiqUSD);
-    document.getElementById('liqCount').innerText = totalCount;
-
-    const isLongLiq = (side === 'SELL'); 
-    const itemEl = document.createElement('div');
-    itemEl.className = 'feed-item';
-    itemEl.innerHTML = `
-      <div class="feed-symbol">${symbol.replace('USDT','')}</div>
-      <div class="feed-amount" style="color: ${isLongLiq ? 'var(--red)' : 'var(--green)'}">${formatCurrency(amount)}</div>
-      <div class="side-tag ${isLongLiq ? 'side-sell' : 'side-buy'}">${isLongLiq ? '多單爆倉' : '空單爆倉'}</div>
-    `;
-
-    const feedList = document.getElementById('feedList');
-    feedList.insertBefore(itemEl, feedList.firstChild);
-    if (feedList.children.length > 50) feedList.removeChild(feedList.lastChild);
-  }
-
-  // 啟動連線
-  connectLiqStream();
 </script>
 </body>
 </html>
