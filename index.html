@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTC & ETH 即時清算爆倉監控</title>
+  <style>
+    :root {
+      --bg-color: #0b0e14;
+      --card-bg: #151a23;
+      --card-sub-bg: #1c2331;
+      --text-main: #f0f3f6;
+      --text-muted: #848e9c;
+      --green: #0ecb81;
+      --red: #f6465d;
+      --yellow: #f0b90b;
+      --border: #232a3b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .status-badge {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(14, 203, 129, 0.15);
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    .hero-stat {
+      margin-bottom: 24px;
+    }
+
+    .hero-title {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .hero-val {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-block {
+      background: var(--card-sub-bg);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 18px;
+      border: 1px solid var(--border);
+    }
+
+    .ratio-bar {
+      height: 28px;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      margin-top: 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .long-side {
+      background: var(--green);
+      color: #0b0e14;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding-left: 10px;
+      transition: width 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .short-side {
+      background: var(--red);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 10px;
+      transition: width 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .price-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .price-card {
+      background: var(--card-sub-bg);
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .price-name {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .price-value {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 4px;
+      transition: color 0.3s ease;
+    }
+
+    .feed-container {
+      max-height: 240px;
+      overflow-y: auto;
+      position: relative;
+    }
+    
+    /* Scrollbar styling for feed container */
+    .feed-container::-webkit-scrollbar {
+      width: 4px;
+    }
+    .feed-container::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    .feed-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 13px;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .feed-item:last-child {
+      border-bottom: none;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .feed-symbol {
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .side-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+      display: inline-block;
+    }
+
+    .side-sell { background: rgba(14, 203, 129, 0.15); color: var(--green); } /* SELL = Long liquidated (Green implies long initially) */
+    .side-buy { background: rgba(246, 70, 93, 0.15); color: var(--red); } /* BUY = Short liquidated */
+
+    .footer-quote {
+      text-align: center;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--yellow);
+    }
+
+    .price-flash-up { color: var(--green) !important; }
+    .price-flash-down { color: var(--red) !important; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div style="font-weight: 700; font-size: 16px;">BTC & ETH 爆倉雷達</div>
+    <div class="status-badge" id="wsStatus">
+      <div class="status-dot"></div>
+      連線中...
+    </div>
+  </div>
+
+  <div class="hero-stat">
+    <div class="hero-title">本次連線監控累計清算額</div>
+    <div class="hero-val" id="totalLiqAmount">$0.00</div>
+    <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+      共捕獲 <span id="liqCount" style="color: #fff; font-weight: 600;">0</span> 筆合約強平訂單
+    </div>
+  </div>
+
+  <!-- 行情卡片 -->
+  <div class="price-grid">
+    <div class="price-card">
+      <div class="price-name">BTCUSDT 永續</div>
+      <div class="price-value" id="btcPrice">--</div>
+    </div>
+    <div class="price-card">
+      <div class="price-name">ETHUSDT 永續</div>
+      <div class="price-value" id="ethPrice">--</div>
+    </div>
+  </div>
+
+  <!-- 多空清算分佈比例 -->
+  <div class="card-block">
+    <div class="section-title">清算方向比例（多單 vs 空單）</div>
+    <div class="ratio-bar">
+      <div class="long-side" id="longBar" style="width: 50%;">多單 50.0%</div>
+      <div class="short-side" id="shortBar" style="width: 50%;">空單 50.0%</div>
+    </div>
+  </div>
+
+  <!-- 即時清算流水 -->
+  <div class="card-block" style="margin-bottom: 0;">
+    <div class="section-title">最新強平訂單流水（自動更新）</div>
+    <div class="feed-container" id="feedList">
+      <div id="emptyMessage" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">
+        等待第一筆清算事件...
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-quote">
+    你的槓桿，扛得住第二根針嗎？
+  </div>
+</div>
+
+<script>
+  let totalLiqUSD = 0;
+  let totalCount = 0;
+  let longLiqUSD = 0;
+  let shortLiqUSD = 0;
+
+  // DOM Elements
+  const totalLiqEl = document.getElementById('totalLiqAmount');
+  const liqCountEl = document.getElementById('liqCount');
+  const longBarEl = document.getElementById('longBar');
+  const shortBarEl = document.getElementById('shortBar');
+  const feedListEl = document.getElementById('feedList');
+  const emptyMessageEl = document.getElementById('emptyMessage');
+  const btcPriceEl = document.getElementById('btcPrice');
+  const ethPriceEl = document.getElementById('ethPrice');
+  const wsStatusEl = document.getElementById('wsStatus');
+
+  // Currency formatter
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+  };
+
+  // Compact currency formatter for smaller layout areas
+  const formatCompact = (amount) => {
+    if (amount >= 1000000) return '$' + (amount / 1000000).toFixed(2) + 'M';
+    if (amount >= 1000) return '$' + (amount / 1000).toFixed(2) + 'K';
+    return '$' + amount.toFixed(2);
+  };
+
+  class MockWebSocket {
+    constructor(url) {
+      this.url = url;
+      setTimeout(() => {
+        if (this.onopen) this.onopen();
+        this.startSimulation();
+      }, 500);
+    }
+
+    startSimulation() {
+      // 模擬清算爆倉數據
+      if (this.url.includes('forceOrder')) {
+        setInterval(() => {
+          if (Math.random() > 0.4) return; // 隨機觸發
+          const isBtc = Math.random() > 0.5;
+          const symbol = isBtc ? 'BTCUSDT' : 'ETHUSDT';
+          const price = isBtc ? 64000 + (Math.random() * 2000 - 1000) : 3400 + (Math.random() * 100 - 50);
+          const qty = isBtc ? Math.random() * 2.5 : Math.random() * 25;
+          const side = Math.random() > 0.5 ? 'SELL' : 'BUY';
+          
+          const fakeData = { o: { s: symbol, S: side, p: price.toFixed(2), q: qty.toFixed(5) } };
+          if (this.onmessage) this.onmessage({ data: JSON.stringify(fakeData) });
+        }, 1500);
+      } 
+      // 模擬即時價格數據
+      else if (this.url.includes('ticker')) {
+        setInterval(() => {
+          const btcPrice = 64000 + (Math.random() * 1000 - 500);
+          const ethPrice = 3400 + (Math.random() * 50 - 25);
+          
+          if (this.onmessage) {
+            this.onmessage({ data: JSON.stringify({ stream: 'btcusdt@ticker', data: { c: btcPrice.toFixed(2) } }) });
+            this.onmessage({ data: JSON.stringify({ stream: 'ethusdt@ticker', data: { c: ethPrice.toFixed(2) } }) });
+          }
+        }, 2000);
+      }
+    }
+  }
+
+  function createSafeWebSocket(url) {
+    try {
+      return new WebSocket(url);
+    } catch (error) {
+      console.warn("Real WebSocket blocked by environment. Using Mock Simulation.", error);
+      // 更新狀態標籤為模擬模式
+      wsStatusEl.innerHTML = `<div class="status-dot" style="background:var(--yellow);"></div> 模擬數據模式`;
+      wsStatusEl.style.color = 'var(--yellow)';
+      wsStatusEl.style.background = 'rgba(240, 185, 11, 0.15)';
+      return new MockWebSocket(url);
+    }
+  }
+
+  const liqWsUrl = "wss://fstream.binance.com/ws/!forceOrder@arr";
+  let liqWs;
+
+  // 將清算連線包裝成函數，方便斷線時重新呼叫
+  function connectLiqWs() {
+    liqWs = createSafeWebSocket(liqWsUrl);
+
+    liqWs.onopen = () => {
+      // 只有在真實連線時才顯示連線中
+      if (liqWs instanceof WebSocket) {
+        wsStatusEl.innerHTML = `<div class="status-dot"></div> 已連線幣安`;
+        wsStatusEl.style.color = 'var(--green)';
+      }
+    };
+
+    liqWs.onerror = () => {
+      wsStatusEl.innerHTML = `<div class="status-dot" style="background:var(--red);"></div> 連線異常`;
+      wsStatusEl.style.color = 'var(--red)';
+    };
+
+    // 加入斷線自動重連機制
+    liqWs.onclose = () => {
+      if (liqWs instanceof WebSocket) {
+        wsStatusEl.innerHTML = `<div class="status-dot" style="background:var(--yellow);"></div> 重新連線中...`;
+        wsStatusEl.style.color = 'var(--yellow)';
+        setTimeout(connectLiqWs, 3000); // 3 秒後自動重新連線
+      }
+    };
+
+    liqWs.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      const order = data.o;
+      const symbol = order.s;
+
+      // Filter only BTC and ETH
+      if (symbol === 'BTCUSDT' || symbol === 'ETHUSDT') {
+        const side = order.S; // "SELL" means Long position was liquidated; "BUY" means Short position was liquidated
+        const price = parseFloat(order.p);
+        const originalQty = parseFloat(order.q);
+        const amountUSD = price * originalQty;
+
+        handleLiquidation(symbol, side, amountUSD, price);
+      }
+    };
+  }
+
+  // 啟動清算監控連線
+  connectLiqWs();
+
+  function handleLiquidation(symbol, side, amount, price) {
+    totalCount++;
+    totalLiqUSD += amount;
+
+    // A ForceOrder to SELL means the trader was LONG and got liquidated.
+    const isLongLiq = (side === 'SELL'); 
+    
+    if (isLongLiq) {
+      longLiqUSD += amount;
+    } else {
+      shortLiqUSD += amount;
+    }
+
+    // 1. Update Hero Stats
+    totalLiqEl.innerText = formatCurrency(totalLiqUSD);
+    liqCountEl.innerText = totalCount;
+
+    // 2. Update Ratio Bar
+    const longPct = totalLiqUSD > 0 ? ((longLiqUSD / totalLiqUSD) * 100) : 50;
+    const shortPct = totalLiqUSD > 0 ? 100 - longPct : 50;
+
+    // Constrain width so text always remains somewhat visible
+    const safeLongPct = Math.max(Math.min(longPct, 95), 5);
+    const safeShortPct = 100 - safeLongPct;
+
+    longBarEl.style.width = `${safeLongPct}%`;
+    longBarEl.innerText = `多單 ${longPct.toFixed(1)}%`;
+    
+    shortBarEl.style.width = `${safeShortPct}%`;
+    shortBarEl.innerText = `空單 ${shortPct.toFixed(1)}%`;
+
+    // 3. Add item to Feed List
+    if (emptyMessageEl) {
+        emptyMessageEl.remove();
+    }
+
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'feed-item';
+    
+    const sideClass = isLongLiq ? 'side-sell' : 'side-buy';
+    const sideText = isLongLiq ? '多單爆倉' : '空單爆倉';
+    const highlightColor = isLongLiq ? 'var(--green)' : 'var(--red)'; // Green for Longs, Red for Shorts visually on tags
+
+    itemDiv.innerHTML = `
+      <div>
+        <span class="feed-symbol">${symbol.replace('USDT', '')}</span>
+        <span class="side-tag ${sideClass}">${sideText}</span>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-weight: 700; color: ${highlightColor}; font-size: 14px;">${formatCompact(amount)}</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">@ ${formatCurrency(price)}</div>
+      </div>
+    `;
+
+    // Insert at the top
+    feedListEl.insertBefore(itemDiv, feedListEl.firstChild);
+
+    // Keep only the last 20 items to prevent DOM bloating
+    if (feedListEl.children.length > 20) {
+      feedListEl.removeChild(feedListEl.lastChild);
+    }
+  }
+
+  let lastBtcPrice = 0;
+  let lastEthPrice = 0;
+  
+  const priceWsUrl = "wss://fstream.binance.com/stream?streams=btcusdt@ticker/ethusdt@ticker";
+  let priceWs;
+
+  // 將價格連線包裝成函數，方便斷線時重新呼叫
+  function connectPriceWs() {
+    priceWs = createSafeWebSocket(priceWsUrl);
+
+    // 加入斷線自動重連機制
+    priceWs.onclose = () => {
+      if (priceWs instanceof WebSocket) {
+        setTimeout(connectPriceWs, 3000); // 3 秒後自動重新連線
+      }
+    };
+
+    priceWs.onmessage = (event) => {
+      const payload = JSON.parse(event.data);
+      const stream = payload.stream;
+      const data = payload.data;
+      
+      const currentPrice = parseFloat(data.c); // Last price
+      
+      if (stream === 'btcusdt@ticker') {
+        updatePriceUI(btcPriceEl, currentPrice, lastBtcPrice);
+        lastBtcPrice = currentPrice;
+      } else if (stream === 'ethusdt@ticker') {
+        updatePriceUI(ethPriceEl, currentPrice, lastEthPrice);
+        lastEthPrice = currentPrice;
+      }
+    };
+  }
+
+  // 啟動即時價格連線
+  connectPriceWs();
+
+  function updatePriceUI(element, current, previous) {
+    element.innerText = formatCurrency(current);
+    
+    // Flash color based on price direction
+    if (previous > 0 && current !== previous) {
+        element.classList.remove('price-flash-up', 'price-flash-down');
+        // Force reflow for animation restart
+        void element.offsetWidth;
+        
+        if (current > previous) {
+            element.classList.add('price-flash-up');
+        } else {
+            element.classList.add('price-flash-down');
+        }
+        
+        // Remove class after short delay
+        setTimeout(() => {
+            element.classList.remove('price-flash-up', 'price-flash-down');
+            element.style.color = 'var(--text-main)';
+        }, 300);
+    }
+  }
+
+</script>
+</body>
+</html>
